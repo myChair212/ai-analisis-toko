@@ -43,56 +43,50 @@ if uploaded_file:
         st.success(f"✓ Berhasil memuat berkas: **{uploaded_file.name}** ({jumlah_baris} baris data)")
         
         # Deteksi otomatis letak kolom Ulasan dan Label di dalam file yang diupload
+        # --- LOGIKA BARU: HANYA MENDETEKSI KOLOM ULASAN ---
         kolom_ulasan = None
-        kolom_label = None
-        
         for col in df.columns:
             col_lower = str(col).lower()
+            # Mendeteksi jika ada kolom dengan nama ulasan, text, komentar, atau review
             if 'ulasan' in col_lower or 'text' in col_lower or 'komentar' in col_lower or 'review' in col_lower:
                 kolom_ulasan = col
-            if 'label' in col_lower or 'sentimen' in col_lower or 'status' in col_lower:
-                kolom_label = col
+                break
 
-        # Proteksi jika nama kolom tidak standar
+        # Proteksi otomatis: jika nama kolom tidak standar, gunakan kolom pertama (indeks 0)
         if kolom_ulasan is None and len(df.columns) > 0:
             kolom_ulasan = df.columns[0]
+            df = df.rename(columns={kolom_ulasan: 'Ulasan'})
+            kolom_ulasan = 'Ulasan'
         
-        # SYARAT UTAMA: File harus punya kolom Ulasan dan kolom Label agar AI bisa belajar
-        if kolom_ulasan and kolom_label:
-            st.info("🧠 Men-generate Otak AI baru secara otomatis langsung dari data Anda...")
+        # --- EKSEKUSI PREDIKSI KARENA KOLOM LABEL SUDAH TIDAK DIWAJIBKAN ---
+        if kolom_ulasan:
+            st.info("🧠 AI sedang menyisir teks ulasan dan melakukan analisis sentimen mandiri...")
             
-            # 🚀 PROSES GENERATE OTAK AI LANGSUNG DARI FILE UPLOAD
-            # AI membaca kombinasi kata n-gram (1-3 kata) dari file yang Anda upload
-            vectorizer = TfidfVectorizer(ngram_range=(1, 3), lowercase=True)
-            X_train = vectorizer.fit_transform(df[kolom_ulasan].astype(str))
-            y_train = df[kolom_label].astype(str)
+            # 1. Mengubah teks ulasan polos menjadi vektor matematika
+            X_new = vectorizer.transform(df[kolom_ulasan].astype(str))
             
-            # Melatih model secara instan di memori RAM server
-            model = LogisticRegression(class_weight='balanced')
-            model.fit(X_train, y_train)
+            # 2. AI langsung menebak hasilnya sendiri tanpa bantuan kolom label/status dari file
+            df['Hasil_Analisis_AI'] = model.predict(X_new)
             
-            st.success("✨ Sukses! Otak AI telah berhasil dirakit dan disesuaikan dengan pola data Anda.")
-            st.divider()
-            
-            # Menghitung hasil prediksi untuk visualisasi dashboard
-            df['Prediksi_AI'] = model.predict(X_train)
-            
-            # Standardisasi teks label agar rapi di grafik
+            # 3. Merapikan teks output agar cantik saat ditampilkan di Grafik Pai dan Tabel
             def standarkan_output(x):
                 if str(x) == "1" or "membeli" in str(x).lower() or "positif" in str(x).lower():
                     return "Membeli (Positif)"
                 return "Tidak Membeli (Negatif)"
             
-            df['Status_Teks'] = df['Prediksi_AI'].apply(standarkan_output)
+            df['Status_Teks'] = df['Hasil_Analisis_AI'].apply(standarkan_output)
 
-            # --- 4. TAMPILAN DASHBOARD HASIL GENERATE AI ---
+            # =========================================================================
+            # TAMPILAN DASHBOARD (Grafik Pai, Word Cloud, Tabel, & Pusat Unduh)
+            # Taruh seluruh kode visualisasi Anda di bawah sini dengan lekukan (indentasi) yang pas
+            # =========================================================================
             
             # A. Grafik Pai Distribusi Sentimen
             st.header("📊 Ringkasan Distribusi Sentimen")
             fig_pie = px.pie(df, names='Status_Teks', hole=0.4, color='Status_Teks', color_discrete_map={'Membeli (Positif)': '#10b981', 'Tidak Membeli (Negatif)': '#ef4444'})
             fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5))
             st.plotly_chart(fig_pie, use_container_width=True)
-            st.divider() 
+            st.divider()
             
             # B. Word Cloud
             st.header("🔍 Kata Kunci Terpopuler")
