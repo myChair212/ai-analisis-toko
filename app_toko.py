@@ -161,14 +161,27 @@ if uploaded_file:
         st.download_button(label="📥 Unduh Laporan Excel Lengkap (.xlsx)", data=output.getvalue(), file_name="Laporan_AutoML.xlsx", mime="application/vnd.ms-excel", use_container_width=True)
         st.divider()
 
-        # --- BAGIAN E: UJI COBA REAL-TIME ---
+        # --- BAGIAN E: UJI COBA REAL-TIME (VERSI PINTAR MULTI-LABEL) ---
         st.header("🧠 Kotak Uji Coba Cepat")
         input_text = st.text_input("Ketik ulasan baru untuk diuji oleh otak AI hasil training:")
+        
         if input_text:
             vec_input = vectorizer.transform([input_text])
             pred = model.predict(vec_input)[0]
-            warna = "green" if pred == "Membeli" else "red"
-            st.markdown(f"### Hasil Analisis: :{warna}[{pred}]")
+            
+            # KANAL PENERJEMAH: Ubah angka 0/1 menjadi teks agar enak dibaca manusia
+            if str(pred) == "1" or str(pred).lower() == "membeli":
+                hasil_teks = "Membeli (Positif)"
+                warna = "green"
+            elif str(pred) == "0" or str(pred).lower() == "tidak membeli":
+                hasil_teks = "Tidak Membeli (Negatif)"
+                warna = "red"
+            else:
+                # Jaga-jaga jika file Anda menggunakan label format lain (A, B, C, dll)
+                hasil_teks = str(pred)
+                warna = "blue"
+                
+            st.markdown(f"### Hasil Analisis: :{warna}[{hasil_teks}]")
             
     else:
         st.error("Gagal memproses file.")
