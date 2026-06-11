@@ -7,20 +7,12 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-# --- 1. PENGATURAN HALAMAN & GAYA VISUAL ---
+# --- 1. PENGATURAN HALAMAN (Tata Letak Tengah Bersih) ---
 st.set_page_config(page_title="AI Analisis Toko Pro", layout="centered")
 
-# Menggunakan CSS bawaan untuk mempercantik font dan spasi card
-st.markdown("""
-    <style>
-    .reportview-container { background: #0f172a; }
-    h1, h2, h3 { font-family: 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.5px; }
-    .stProgress > div > div > div > div { background-image: linear-gradient(to right, #00c6ff, #0072ff); }
-    </style>
-""", unsafe_allowed_html=True)
-
 st.title("🚀 Platform AI Analisis Konsumen")
-st.markdown("---")
+st.markdown("Analisis ulasan otomatis dengan struktur visual linear yang rapi.")
+st.divider()
 
 # --- 2. DATA SETTINGAN BAWAAN (Modal Otak AI) ---
 @st.cache_resource
@@ -92,7 +84,6 @@ if uploaded_file:
             # ---------------------------------------------------------
             st.header("📊 Ringkasan Distribusi Sentimen")
             
-            # Modifikasi warna chart agar elegan (Teal untuk Membeli, Coral-Red untuk Tidak Membeli)
             warna_custom = {'Membeli': '#10b981', 'Tidak Membeli': '#ef4444'}
             fig_pie = px.pie(
                 df, 
@@ -107,31 +98,27 @@ if uploaded_file:
             )
             st.plotly_chart(fig_pie, use_container_width=True)
             
-            st.divider() # Garis pembatas elegan
+            st.divider() 
             
             # ---------------------------------------------------------
-            # BAGIAN B: WORD CLOUD PREMIUM (TERLINDUNG DI LATAR BELAKANG GELAP)
+            # BAGIAN B: WORD CLOUD ELEGAN
             # ---------------------------------------------------------
             st.header("🔍 Kata Kunci yang Sering Muncul")
             
             text_combined = " ".join(df[kolom_ulasan].astype(str)).lower()
             if text_combined.strip():
-                # Settingan Word Cloud Mewah
+                # Word Cloud dengan latar belakang putih bersih agar aman dan kontras tinggi
                 wc = WordCloud(
                     width=1000, height=450,
-                    background_color="#1e293b", # Warna gelap charcoal murni
-                    colormap="GnBu",            # Gradasi warna Hijau-Teal-Biru yang sejuk
-                    prefer_horizontal=0.85,     # Dominan horizontal agar mudah dibaca
-                    max_words=100,              # Batasi agar tidak terlalu penuh sesak
-                    contour_width=1,
-                    contour_color="#334155"
+                    background_color="white", 
+                    colormap="viridis", # Warna gradasi ungu-biru-hijau modern
+                    prefer_horizontal=0.85,
+                    max_words=100
                 ).generate(text_combined)
                 
-                fig_wc, ax = plt.subplots(figsize=(10, 4.5), facecolor="#1e293b")
+                fig_wc, ax = plt.subplots(figsize=(10, 4.5), facecolor="white")
                 ax.imshow(wc, interpolation='bilinear')
                 ax.axis("off")
-                
-                # Render ke layar secara penuh
                 st.pyplot(fig_wc, use_container_width=True)
             else:
                 st.text("Teks tidak cukup untuk membuat analisis kata kunci.")
@@ -142,7 +129,6 @@ if uploaded_file:
             # BAGIAN C: DATA DETIL TABEL
             # ---------------------------------------------------------
             st.header("📋 Hasil Detil Analisis Per Baris")
-            st.markdown("Menampilkan ulasan asli beserta tebakan otomatis dari sistem AI:")
             st.dataframe(df[[kolom_ulasan, 'Prediksi_AI']], use_container_width=True, height=350)
             
             st.divider()
@@ -151,7 +137,6 @@ if uploaded_file:
             # BAGIAN D: TOMBOL UNDUH LAPORAN
             # ---------------------------------------------------------
             st.header("📥 Pusat Unduh")
-            st.markdown("Unduh hasil analisis di atas ke dalam format Excel untuk bahan laporan internal:")
             
             output = BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -162,16 +147,16 @@ if uploaded_file:
                 data=output.getvalue(),
                 file_name="Laporan_Analisis_Masal_AI.xlsx",
                 mime="application/vnd.ms-excel",
-                use_container_width=True # Tombol memanjang penuh agar terlihat kokoh
+                use_container_width=True 
             )
             
             st.divider()
 
             # ---------------------------------------------------------
-            # BAGIAN E: UJI COBA REAL-TIME (Paling Bawah sebagai Bonus)
+            # BAGIAN E: UJI COBA REAL-TIME
             # ---------------------------------------------------------
             st.header("🧠 Kotak Uji Coba Cepat")
-            input_text = st.text_input("Ketik ulasan sembarang di bawah ini untuk melihat reaksi kilat AI:")
+            input_text = st.text_input("Ketik ulasan sembarang di bawah ini:")
             if input_text:
                 vec_input = vectorizer_base.transform([input_text])
                 pred = model_base.predict(vec_input)[0]
@@ -181,5 +166,4 @@ if uploaded_file:
         else:
             st.error("File tidak memiliki kolom teks yang bisa dibaca.")
 else:
-    # Tampilan awal saat baru membuka web (Elegan & Bersih)
     st.info("👋 Selamat Datang! Silakan unggah file Excel/CSV data toko Anda melalui menu sidebar di sebelah kiri untuk memulai analisis otomatis.")
