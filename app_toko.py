@@ -8,7 +8,23 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 import os
 
-# --- 1. PENGATURAN HALAMAN ---
+# =========================================================================
+# KUMPULAN FUNGSI PENERJEMAH (DITARUH DI ATAS AGAR MUDAH DICARI)
+# =========================================================================
+
+# Ini adalah fungsi perbaikan logika yang sudah aman agar tabel tidak positif semua
+def standarkan_output_akurat(x):
+    x_clean = str(x).lower().strip()
+    if "tidak" in x_clean or "negatif" in x_clean or x_clean == "0":
+        return "Tidak Membeli (Negatif)"
+    elif "membeli" in x_clean or "positif" in x_clean or x_clean == "1":
+        return "Membeli (Positif)"
+    return "Tidak Membeli (Negatif)"
+
+
+# =========================================================================
+# SISA KODE HALAMAN UTAMA & SIDEBAR ANDA KE BAWAH...
+# =========================================================================
 st.set_page_config(page_title="AI Analisis Toko Publik", layout="centered")
 
 st.title("🚀 Platform AI Analisis Konsumen (Advanced Pure Analytics)")
@@ -95,9 +111,7 @@ if uploaded_file:
             X_new = vectorizer.transform(df[kolom_ulasan].astype(str))
             df['Hasil_Analisis_AI'] = model.predict(X_new)
             
-            df['Status_Teks'] = df['Hasil_Analisis_AI'].apply(
-                lambda x: "Membeli (Positif)" if str(x).lower() == 'membeli' else "Tidak Membeli (Negatif)"
-            )
+            df['Status_Teks'] = df['Hasil_Analisis_AI'].apply(standarkan_output_akurat)
             
             # --- TAMPILAN DASHBOARD ---
             st.header("📊 Ringkasan Distribusi Sentimen")
