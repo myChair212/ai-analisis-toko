@@ -1,73 +1,105 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+import plotly.express as px
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+from io import BytesIO
 
-# 1. MEMBUAT TAMPILAN WEB (FRONTEND) DENGAN PYTHON
-st.set_page_config(page_title="AI Analisis Toko", layout="centered")
-st.title("🚀 Aplikasi AI Analisis Pelanggan")
-st.write("Silakan unggah file Excel data toko Anda untuk melatih AI secara otomatis.")
+# --- CONFIG HALAMAN ---
+st.set_page_config(page_title="AI Analisis Toko Pro", layout="wide")
 
-# KODE UTAMA: Membuat Tombol Upload File di Halaman Web
-file_terunggah = st.file_uploader("Pilih file Excel (.xlsx)", type=["xlsx"])
+st.title("🚀 Platform AI Analisis Konsumen (Premium)")
+st.markdown("Analisis ulasan dari berbagai format file dan dapatkan insight bisnis instan.")
 
-# 2. PROSES JIKA PENGGUNA SUDAH MENGUNGGAH FILE
-if file_terunggah is not None:
-    # Membaca file Excel yang diunggah pengguna langsung dari memori web
-    df = pd.read_excel(file_terunggah, sheet_name='Data Pelanggan')
+# --- SIDEBAR: UNGGAH FILE ---
+st.sidebar.header("Pusat Unggah Data")
+uploaded_file = st.sidebar.file_uploader(
+    "Pilih file (Excel, CSV, JSON, atau TXT)", 
+    type=['xlsx', 'xls', 'csv', 'json', 'txt']
+)
+
+# Fungsi untuk membaca berbagai format
+@st.cache_data
+def load_data(file):
+    name = file.name
+    if name.endswith('.xlsx') or name.endswith('.xls'):
+        return pd.read_excel(file)
+    elif name.endswith('.csv'):
+        return pd.read_csv(file)
+    elif name.endswith('.json'):
+        return pd.read_json(file)
+    elif name.endswith('.txt'):
+        text = file.read().decode("utf-8").splitlines()
+        return pd.DataFrame(text, columns=['Ulasan'])
+    return None
+
+if uploaded_file:
+    df = load_data(uploaded_file)
     
-    # Menampilkan tabel data di halaman web
-    st.success("File berhasil diunggah! Berikut adalah 5 data teratas Anda:")
-    st.dataframe(df.head(5))
-    
-    # Menghitung baris otomatis untuk otak adaptif kita
-    jumlah_baris = len(df)
-    st.info(f"Sistem mendeteksi data latihan: {jumlah_baris} baris.")
-    
-    # --- PROSES OTAK AI ADAPTIF (Sama seperti skrip Anda sebelumnya) ---
-    kata_tidak_penting = ['dan', 'di', 'saat', 'ini', 'itu', 'yang', 'saya', 'juga', 'pas', 'agak', 'sih']
-    
-    if jumlah_baris <= 50:
-        vektor_nlp = TfidfVectorizer(max_features=10, stop_words=kata_tidak_penting)
-        mode_hybrid = True
-    else:
-        vektor_nlp = TfidfVectorizer(max_features=200, stop_words=kata_tidak_penting)
-        mode_hybrid = False
+    if df is not None:
+        st.success(f"Berhasil memuat data: {uploaded_file.name}")
         
-    # Preprocessing
-    df['Gender'] = df['Gender'].map({'Pria': 0, 'Wanita': 1})
-    df_tabular = pd.get_dummies(df[['Umur', 'Gender', 'Lokasi', 'Skor Buka App']], columns=['Lokasi'], dtype=int)
-    X_tabular_angka = df_tabular.values 
-    X_nlp_angka = vektor_nlp.fit_transform(df['Ulasan Pelanggan']).toarray()
-    X_gabungan = np.hstack((X_tabular_angka, X_nlp_angka))
-    y = df['Status Membeli'].values
-    
-    # Latih AI
-    model_super = LogisticRegression(max_iter=1000, class_weight='balanced')
-    model_super.fit(X_gabungan, y)
-    st.write("🧠 **Status Otak AI:** Sukses dilatih dan siap memprediksi!")
-    
-    # --- FORM INPUT UNTUK MEMPREDIKSI DATA BARU ---
-    st.subheader("🔮 Uji Coba Prediksi Konsumen Baru")
-    ulasan_input = st.text_input("Masukkan Kalimat Ulasan Konsumen Baru:", "Barangnya hancur pas sampai kecewa")
-    
-    if st.button("Analisis Sekarang"):
-        # Dummy data untuk tabular baru (Umur 30, Wanita, Skor 8, Surabaya)
-        data_tabular_baru = [30, 1, 8, 0, 0, 1]
-        
-        if mode_hybrid and any(kata in ulasan_input.lower() for kata in ['kecewa', 'rusak', 'hancur', 'jelek']):
-            hasil = "Tidak Membeli (Negatif/Komplain) [Sistem Satpam]"
-        else:
-            data_nlp_baru = vektor_nlp.transform([ulasan_input]).toarray()[0]
-            fitur_baru = np.hstack((data_tabular_baru, data_nlp_baru)).reshape(1, -1)
-            tebakan = model_super.predict(fitur_baru)
-            hasil = "Membeli" if tebakan[0] == 1 else "Masih Mikir-mikir" if tebakan[0] == 2 else "Tidak Membeli"
+        # --- LOGIKA AI (TRAINING OTOMATIS) ---
+        if 'Ulasan' in df.columns and 'Label' in df.columns:
+            vectorizer = TfidfVectorizer()
+            X = vectorizer.fit_transform(df['Ulasan'].astype(str))
+            y = df['Label']
             
-        # TAMPILAN KOTAK WARNA ADAPTIF (Sempurna untuk Mode Satpam maupun Mode AI)
-        if "Negatif" in hasil or "Sistem" in hasil or "Tidak Membeli" in hasil:
-            st.error(f"**Hasil Analisis:** {hasil}")
-        elif "Mikir" in hasil:
-            st.warning(f"**Hasil Analisis:** {hasil}")
+            model = LogisticRegression()
+            model.fit(X, y)
+            
+            # --- DASHBOARD VISUAL ---
+            st.header("📊 Dashboard Analitik")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Distribusi Sentimen")
+                fig_pie = px.pie(df, names='Label', hole=0.3, color_discrete_sequence=px.colors.sequential.RdBu)
+                st.plotly_chart(fig_pie, use_container_width=True)
+                
+            with col2:
+                st.subheader("Analisis Kata Kunci (Word Cloud)")
+                text_combined = " ".join(df['Ulasan'].astype(str))
+                wc = WordCloud(width=800, height=400, background_color='white').generate(text_combined)
+                fig_wc, ax = plt.subplots()
+                ax.imshow(wc, interpolation='bilinear')
+                ax.axis("off")
+                st.pyplot(fig_wc)
+
+            # --- FITUR PREDIKSI INDIVIDUAL ---
+            st.divider()
+            st.header("🧠 Uji Prediksi Real-Time")
+            input_text = st.text_input("Masukkan ulasan baru untuk diuji oleh AI:")
+            
+            if input_text:
+                vec_input = vectorizer.transform([input_text])
+                pred = model.predict(vec_input)[0]
+                warna = "green" if pred == "Membeli" else "red"
+                st.markdown(f"### Hasil Analisis: :{warna}[{pred}]")
+
+            # --- FITUR EXPORT DATA ---
+            st.divider()
+            st.header("📥 Ekspor Laporan Bisnis")
+            
+            # Tambahkan kolom prediksi ke seluruh data original
+            df['Prediksi_AI'] = model.predict(X)
+            
+            # Tombol Download Excel
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Hasil_Analisis')
+            
+            st.download_button(
+                label="Unduh Laporan Excel Lengkap",
+                data=output.getvalue(),
+                file_name="Laporan_Analisis_AI.xlsx",
+                mime="application/vnd.ms-excel"
+            )
         else:
-            st.success(f"**Hasil Analisis:** {hasil}")
+            st.error("Format kolom tidak sesuai. Pastikan file memiliki kolom 'Ulasan' dan 'Label' untuk melatih AI.")
+    else:
+        st.error("Gagal memproses file.")
+else:
+    st.info("Silakan unggah file di sidebar untuk memulai analisis.")
