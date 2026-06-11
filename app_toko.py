@@ -11,107 +11,107 @@ import os
 # --- 1. PENGATURAN HALAMAN ---
 st.set_page_config(page_title="AI Analisis Toko Publik", layout="centered")
 
-st.title("🚀 Platform AI Analisis Konsumen (Public Engine)")
+st.title("🚀 Platform AI Analisis Konsumen (Pure Analytics)")
 st.markdown("""
-👋 Selamat datang! Platform ini disediakan untuk publik secara gratis. 
-Anda dapat menganalisis sentimen ulasan konsumen Anda secara masal dengan aman. 
-**Jaminan Privasi:** Data yang Anda unggah hanya diproses sementara di memori server dan langsung dihapus saat sesi selesai.
+👋 Selamat datang! Sistem ini dikonfigurasi untuk menganalisis data ulasan konsumen yang **polosan (tanpa label)**.
+AI akan membaca teks ulasan Anda, menganalisis bobot katanya secara mandiri, dan merakit laporan analisis lengkap untuk Anda.
 """)
 st.divider()
 
-# --- 2. SIDEBAR: TEMPAT PUBLIK UNGGAH FILE MEREKA ---
+# --- 2. SIDEBAR: PUSAT UNGGAH DATA POLOS ---
 st.sidebar.header("📁 Unggah Berkas Anda")
 uploaded_file = st.sidebar.file_uploader(
-    "Silakan pilih file ulasan Anda (Excel/CSV/TXT)", 
-    type=['xlsx', 'xls', 'csv', 'txt']
+    "Unggah file Excel ulasan kosong Anda", 
+    type=['xlsx', 'xls', 'csv']
 )
 
-def load_data_publik(file):
-    name = file.name
-    ext = os.path.splitext(name)[1].lower()
-    try:
-        if ext in ['.xlsx', '.xls']:
-            return pd.read_excel(file)
-        elif ext == '.csv':
-            return pd.read_csv(file)
-        elif ext == '.txt':
-            text = file.read().decode("utf-8").splitlines()
-            return pd.DataFrame(text, columns=['Ulasan'])
-    except Exception as e:
-        st.error(f"Gagal membaca file: {str(e)}")
-        return None
-    return None
-
-# --- 3. PEMROSESAN ANALITIK UNTUK PUBLIK ---
-if uploaded_file:
-    df = load_data_publik(uploaded_file)
+# --- 3. OTAK UTAMA AI (INTELLIGENT KNOWLEDGE BASE) ---
+@st.cache_resource
+def inisialisasi_otak_ai():
+    # Ini adalah pola hafalan dasar N-Gram agar AI tahu kata mana yang bermakna positif/negatif
+    data_pengetahuan = {
+        'Ulasan': [
+            'bagus banget suka pas mantap', 
+            'rusak hancur kecewa jelek buruk', 
+            'cepat ramah kurir baik', 
+            'lambat telat parah kapok', 
+            'oke produk original sesuai', 
+            'menyesal salah warna robek'
+        ],
+        'Label': ['Membeli', 'Tidak Membeli', 'Membeli', 'Tidak Membeli', 'Membeli', 'Tidak Membeli']
+    }
+    df_knowledge = pd.DataFrame(data_pengetahuan)
     
+    # Menggunakan kombinasi N-gram (1 sampai 3 kata) seperti versi sukses kemarin
+    vectorizer = TfidfVectorizer(ngram_range=(1, 3), lowercase=True)
+    X_train = vectorizer.fit_transform(df_knowledge['Ulasan'])
+    
+    model = LogisticRegression(class_weight='balanced')
+    model.fit(X_train, df_knowledge['Label'])
+    
+    return vectorizer, model
+
+# Aktifkan otak AI di latar belakang
+vectorizer, model = inisialisasi_otak_ai()
+
+# --- 4. PEMROSESAN & EKSEKUSI PREDIKSI MANDIRI ---
+if uploaded_file:
+    # Membaca file mentah uploader
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
+    if ext in ['.xlsx', '.xls']:
+        df = pd.read_excel(uploaded_file)
+    else:
+        df = pd.read_csv(uploaded_file)
+        
     if df is not None:
         jumlah_baris = len(df)
-        st.success(f"✓ Berhasil memuat data Anda: **{uploaded_file.name}** ({jumlah_baris} baris data)")
+        st.success(f"✓ Berhasil memuat: **{uploaded_file.name}** ({jumlah_baris} baris ulasan terdeteksi)")
         
-        # Deteksi otomatis kolom ulasan dan kolom label/target (jika ada)
+        # Deteksi otomatis letak kolom teks ulasan
         kolom_ulasan = None
-        kolom_label = None
-        
         for col in df.columns:
-            col_lower = str(col).lower()
-            if 'ulasan' in col_lower or 'text' in col_lower or 'komentar' in col_lower or 'review' in col_lower:
+            if 'ulasan' in str(col).lower() or 'text' in str(col).lower() or 'komentar' in str(col).lower():
                 kolom_ulasan = col
-            if 'label' in col_lower or 'sentimen' in col_lower or 'status' in col_lower:
-                kolom_label = col
-
+                break
+        
         if kolom_ulasan is None and len(df.columns) > 0:
             kolom_ulasan = df.columns[0]
             df = df.rename(columns={kolom_ulasan: 'Ulasan'})
             kolom_ulasan = 'Ulasan'
-
-        # --- LOGIKA AUTO-TRAINING AMAN (MENGGUNAKAN DATA YANG DIUNGGAH PUBLIK) ---
-        # Skenario A: Jika publik mengunggah data latihan yang sudah ada label kuncinya (0/1 atau Membeli/Tidak)
-        if kolom_label and df[kolom_label].notna().any():
-            st.info("🧠 AI sedang mempelajari pola karakteristik sentimen data Anda...")
-            vectorizer = TfidfVectorizer(ngram_range=(1, 3), lowercase=True)
-            X_train = vectorizer.fit_transform(df[kolom_ulasan].astype(str))
-            y_train = df[kolom_label].astype(str)
             
-            model = LogisticRegression(class_weight='balanced')
-            model.fit(X_train, y_train)
-            
-            df['Prediksi_AI'] = model.predict(X_train)
-            label_display = 'Prediksi_AI'
-            st.success("✨ Model AI kustom berhasil dirakit khusus untuk data Anda!")
-            
-        # Skenario B: Jika publik mengunggah data polos tanpa label, kita gunakan modal otak bawaan
-        else:
-            st.info("🧠 Menganalisis data menggunakan Otak AI Standar Industri...")
-            # Data modal dasar agar aplikasi tidak kosong jika publik upload data polosan
-            data_modal = {
-                'Ulasan': ['bagus suka', 'rusak hancur kecewa', 'cepat ramah', 'lambat telat parah', 'oke mantap', 'jelek buruk menyesal'],
-                'Label': ['Membeli', 'Tidak Membeli', 'Membeli', 'Tidak Membeli', 'Membeli', 'Tidak Membeli']
-            }
-            df_modal = pd.DataFrame(data_modal)
-            vectorizer = TfidfVectorizer(ngram_range=(1, 3), lowercase=True)
-            X_modal = vectorizer.fit_transform(df_modal['Ulasan'])
-            model = LogisticRegression(class_weight='balanced')
-            model.fit(X_modal, df_modal['Label'])
-            
-            X_new = vectorizer.transform(df[kolom_ulasan].astype(str))
-            df['Prediksi_AI'] = model.predict(X_new)
-            label_display = 'Prediksi_AI'
-
-        # Konversi hasil tebakan agar ramah dibaca manusia di grafik
-        df['Status_Teks'] = df[label_display].apply(lambda x: "Tidak Membeli (Negatif)" if str(x)=='0' or 'tidak' in str(x).lower() else "Membeli (Positif)")
-
-        # --- TAMPILKAN SELURUH HASIL ANALISIS SENSASIONAL KEDALAM BENTUK LINEAR ---
+        # 🏃‍♂️ PROSES INTI: AI MENGANALISA SENDIRI SECARA MANDIRI
+        st.info("🧠 AI sedang menyisir teks dan melakukan analisis sentimen mandiri...")
         
-        # A. Grafik Pai Distribusi Sentimen
-        st.header("📊 Ringkasan Distribusi Sentimen")
-        fig_pie = px.pie(df, names='Status_Teks', hole=0.4, color='Status_Teks', color_discrete_map={'Membeli (Positif)': '#10b981', 'Tidak Membeli (Negatif)': '#ef4444'})
-        fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5))
+        # Mengubah teks ulasan baru menjadi vektor matematika
+        X_new = vectorizer.transform(df[kolom_ulasan].astype(str))
+        
+        # AI menebak hasilnya secara mandiri (Output: 'Membeli' atau 'Tidak Membeli')
+        df['Hasil_Analisis_AI'] = model.predict(X_new)
+        
+        # Merapikan teks label untuk keperluan visualisasi dashboard publik
+        df['Status_Teks'] = df['Hasil_Analisis_AI'].apply(
+            lambda x: "Membeli (Positif)" if str(x).lower() == 'membeli' else "Tidak Membeli (Negatif)"
+        )
+        
+        # --- TAMPILAN DASHBOARD HASIL ANALISIS AI ---
+        
+        # A. Grafik Distribusi Hasil Prediksi AI
+        st.header("📊 Ringkasan Distribusi Sentimen Hasil Analisis AI")
+        fig_pie = px.pie(
+            df, 
+            names='Status_Teks', 
+            hole=0.4, 
+            color='Status_Teks', 
+            color_discrete_map={'Membeli (Positif)': '#10b981', 'Tidak Membeli (Negatif)': '#ef4444'}
+        )
+        fig_pie.update_layout(
+            margin=dict(t=20, b=20, l=20, r=20),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
+        )
         st.plotly_chart(fig_pie, use_container_width=True)
         st.divider() 
         
-        # B. Word Cloud Premium
+        # B. Word Cloud dari Dokumen Publik
         st.header("🔍 Kata Kunci Terpopuler")
         text_combined = " ".join(df[kolom_ulasan].astype(str)).lower()
         if text_combined.strip():
@@ -122,31 +122,40 @@ if uploaded_file:
             st.pyplot(fig_wc, use_container_width=True)
         st.divider()
 
-        # C. Tabel Detil Analisis Per Baris
+        # C. Tabel Detil Analisis
         st.header("📋 Hasil Detil Analisis Per Baris")
         st.dataframe(df[[kolom_ulasan, 'Status_Teks']], use_container_width=True, height=300)
         st.divider()
 
-        # D. Tombol Unduh Laporan Excel
+        # D. PUSAT UNDUH: MEMASUKKAN HASIL PREDIKSI AI KE EXCEL BARU
         st.header("📥 Pusat Unduh")
+        st.markdown("Unduh file berkas Anda yang kini telah dilengkapi dengan kolom hasil analisis otomatis oleh AI:")
+        
+        # Merakit file excel baru di RAM memori
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False)
-        st.download_button(label="📥 Unduh Hasil Analisis Lengkap (.xlsx)", data=output.getvalue(), file_name="Hasil_Analisis_Publik.xlsx", mime="application/vnd.ms-excel", use_container_width=True)
+            # File hasil analisis disimpan bersih ke file excel baru
+            df[[kolom_ulasan, 'Status_Teks']].to_excel(writer, index=False, sheet_name='Hasil_Analisis_AI')
+            
+        st.download_button(
+            label="📥 Unduh Hasil Analisis Lengkap (.xlsx)", 
+            data=output.getvalue(), 
+            file_name="Laporan_Analisis_Sentimen_AI.xlsx", 
+            mime="application/vnd.ms-excel", 
+            use_container_width=True
+        )
         st.divider()
 
         # E. Kotak Uji Cepat Real-time
         st.header("🧠 Kotak Uji Coba Cepat")
-        input_text = st.text_input("Ketik ulasan individu baru untuk diuji langsung:")
+        input_text = st.text_input("Ketik sampel kalimat baru untuk diuji langsung:")
         if input_text:
             vec_input = vectorizer.transform([input_text])
             pred = model.predict(vec_input)[0]
-            if str(pred) == "0" or 'tidak' in str(pred).lower():
-                st.markdown("### Hasil Analisis: :red[Tidak Membeli (Negatif)]")
-            else:
+            if str(pred).lower() == 'membeli':
                 st.markdown("### Hasil Analisis: :green[Membeli (Positif)]")
-    else:
-        st.error("Format berkas tidak dikenali.")
+            else:
+                st.markdown("### Hasil Analisis: :red[Tidak Membeli (Negatif)]")
+                
 else:
-    # Landing page awal publik saat link dibuka (Ramah & Informatif)
-    st.info("👋 Selamat Datang! Untuk mulai menganalisis ulasan konsumen Anda dan melihat Dashboard Grafik, silakan unggah file Excel/CSV/TXT toko Anda melalui menu sidebar di sebelah kiri.")
+    st.info("👋 Sistem Pure Analytics Siap! Silakan unggah file Excel ulasan polosan Anda (tanpa kolom status) di sidebar untuk melihat kehebatan AI menganalisis data Anda secara mandiri.")
