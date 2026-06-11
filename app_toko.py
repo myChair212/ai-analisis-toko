@@ -7,14 +7,22 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-# --- CONFIG HALAMAN ---
-st.set_page_config(page_title="AI Analisis Toko Pro", layout="wide")
+# --- 1. PENGATURAN HALAMAN & GAYA VISUAL ---
+st.set_page_config(page_title="AI Analisis Toko Pro", layout="centered")
 
-st.title("🚀 Platform AI Analisis Konsumen (Sapu Jagat)")
-st.markdown("Unggah file apa saja, AI akan otomatis melatih diri atau menebak sentimen secara masal.")
+# Menggunakan CSS bawaan untuk mempercantik font dan spasi card
+st.markdown("""
+    <style>
+    .reportview-container { background: #0f172a; }
+    h1, h2, h3 { font-family: 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.5px; }
+    .stProgress > div > div > div > div { background-image: linear-gradient(to right, #00c6ff, #0072ff); }
+    </style>
+""", unsafe_allowed_html=True)
 
-# --- DATA SETTINGAN BAWAAN (Untuk Modal Otak AI) ---
-# Ini data 85 baris Anda kemarin agar AI punya modal kepintaran dasar jika file baru tidak punya label
+st.title("🚀 Platform AI Analisis Konsumen")
+st.markdown("---")
+
+# --- 2. DATA SETTINGAN BAWAAN (Modal Otak AI) ---
 @st.cache_resource
 def buat_otak_palsu():
     data_dasar = {
@@ -34,10 +42,10 @@ def buat_otak_palsu():
 
 vectorizer_base, model_base = buat_otak_palsu()
 
-# --- SIDEBAR: UNGGAH FILE ---
-st.sidebar.header("Pusat Unggah Data")
+# --- 3. SIDEBAR: PUSAT UNGGAH DATA ---
+st.sidebar.header("📁 Pusat Data")
 uploaded_file = st.sidebar.file_uploader(
-    "Pilih file (Excel, CSV, JSON, atau TXT)", 
+    "Unggah file ulasan Anda", 
     type=['xlsx', 'xls', 'csv', 'json', 'txt']
 )
 
@@ -55,13 +63,14 @@ def load_data(file):
         return pd.DataFrame(text, columns=['Ulasan'])
     return None
 
+# --- 4. PEMROSESAN DATA & TAMPILAN LINEAR ---
 if uploaded_file:
     df = load_data(uploaded_file)
     
     if df is not None:
-        st.success(f"Berhasil memuat data: {uploaded_file.name}")
+        st.success(f"✓ Berhasil memuat data: {uploaded_file.name}")
         
-        # Cari nama kolom yang mirip dengan 'Ulasan' (mengantisipasi huruf kecil/besar)
+        # Deteksi otomatis kolom ulasan
         kolom_ulasan = None
         for col in df.columns:
             if 'ulasan' in str(col).lower() or 'text' in str(col).lower() or 'komentar' in str(col).lower():
@@ -69,58 +78,108 @@ if uploaded_file:
                 break
         
         if kolom_ulasan is None and len(df.columns) > 0:
-            # Jika tidak ketemu, paksa pakai kolom pertama sebagai kolom ulasan
             kolom_ulasan = df.columns[0]
             df = df.rename(columns={kolom_ulasan: 'Ulasan'})
             kolom_ulasan = 'Ulasan'
 
         if kolom_ulasan:
-            # --- PROSES PREDIKSI OTOMATIS ---
-            # Tebak sentimen untuk setiap baris di file baru menggunakan otak AI dasar
+            # Jalankan prediksi masal AI
             X_new = vectorizer_base.transform(df[kolom_ulasan].astype(str))
             df['Prediksi_AI'] = model_base.predict(X_new)
             
-            # --- DASHBOARD VISUAL ---
-            st.header("📊 Dashboard Analitik Hasil Tebakan AI")
-            col1, col2 = st.columns(2)
+            # ---------------------------------------------------------
+            # BAGIAN A: GRAFIK PAI (DISTRIBUSI SENTIMEN)
+            # ---------------------------------------------------------
+            st.header("📊 Ringkasan Distribusi Sentimen")
             
-            with col1:
-                st.subheader("Distribusi Hasil Analisis")
-                fig_pie = px.pie(df, names='Prediksi_AI', hole=0.3, color_discrete_sequence=px.colors.sequential.RdBu)
-                st.plotly_chart(fig_pie, use_container_width=True)
+            # Modifikasi warna chart agar elegan (Teal untuk Membeli, Coral-Red untuk Tidak Membeli)
+            warna_custom = {'Membeli': '#10b981', 'Tidak Membeli': '#ef4444'}
+            fig_pie = px.pie(
+                df, 
+                names='Prediksi_AI', 
+                hole=0.4, 
+                color='Prediksi_AI',
+                color_discrete_map=warna_custom
+            )
+            fig_pie.update_layout(
+                margin=dict(t=20, b=20, l=20, r=20),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5)
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            st.divider() # Garis pembatas elegan
+            
+            # ---------------------------------------------------------
+            # BAGIAN B: WORD CLOUD PREMIUM (TERLINDUNG DI LATAR BELAKANG GELAP)
+            # ---------------------------------------------------------
+            st.header("🔍 Kata Kunci yang Sering Muncul")
+            
+            text_combined = " ".join(df[kolom_ulasan].astype(str)).lower()
+            if text_combined.strip():
+                # Settingan Word Cloud Mewah
+                wc = WordCloud(
+                    width=1000, height=450,
+                    background_color="#1e293b", # Warna gelap charcoal murni
+                    colormap="GnBu",            # Gradasi warna Hijau-Teal-Biru yang sejuk
+                    prefer_horizontal=0.85,     # Dominan horizontal agar mudah dibaca
+                    max_words=100,              # Batasi agar tidak terlalu penuh sesak
+                    contour_width=1,
+                    contour_color="#334155"
+                ).generate(text_combined)
                 
-            with col2:
-                st.subheader("Analisis Kata Kunci (Word Cloud)")
-                text_combined = " ".join(df[kolom_ulasan].astype(str))
-                if text_combined.strip():
-                    wc = WordCloud(width=800, height=400, background_color='white').generate(text_combined)
-                    fig_wc, ax = plt.subplots()
-                    ax.imshow(wc, interpolation='bilinear')
-                    ax.axis("off")
-                    st.pyplot(fig_wc)
-                else:
-                    st.text("Teks tidak cukup untuk membuat Word Cloud.")
-
-            # --- TAMPILKAN TABEL HASIL ---
+                fig_wc, ax = plt.subplots(figsize=(10, 4.5), facecolor="#1e293b")
+                ax.imshow(wc, interpolation='bilinear')
+                ax.axis("off")
+                
+                # Render ke layar secara penuh
+                st.pyplot(fig_wc, use_container_width=True)
+            else:
+                st.text("Teks tidak cukup untuk membuat analisis kata kunci.")
+                
             st.divider()
-            st.header("📋 Data Hasil Analisis Otomatis")
-            st.dataframe(df[[kolom_ulasan, 'Prediksi_AI']].head(20))
 
-            # --- FITUR EXPORT DATA ---
+            # ---------------------------------------------------------
+            # BAGIAN C: DATA DETIL TABEL
+            # ---------------------------------------------------------
+            st.header("📋 Hasil Detil Analisis Per Baris")
+            st.markdown("Menampilkan ulasan asli beserta tebakan otomatis dari sistem AI:")
+            st.dataframe(df[[kolom_ulasan, 'Prediksi_AI']], use_container_width=True, height=350)
+            
             st.divider()
-            st.header("📥 Ekspor Laporan Bisnis")
+
+            # ---------------------------------------------------------
+            # BAGIAN D: TOMBOL UNDUH LAPORAN
+            # ---------------------------------------------------------
+            st.header("📥 Pusat Unduh")
+            st.markdown("Unduh hasil analisis di atas ke dalam format Excel untuk bahan laporan internal:")
             
             output = BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Hasil_Analisis')
+                df.to_excel(writer, index=False, sheet_name='Analisis_AI_Toko')
             
             st.download_button(
-                label="Unduh Laporan Hasil Tebakan AI (.xlsx)",
+                label="📥 Unduh Laporan Excel Lengkap (.xlsx)",
                 data=output.getvalue(),
-                file_name="Hasil_Analisis_Masal_AI.xlsx",
-                mime="application/vnd.ms-excel"
+                file_name="Laporan_Analisis_Masal_AI.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True # Tombol memanjang penuh agar terlihat kokoh
             )
+            
+            st.divider()
+
+            # ---------------------------------------------------------
+            # BAGIAN E: UJI COBA REAL-TIME (Paling Bawah sebagai Bonus)
+            # ---------------------------------------------------------
+            st.header("🧠 Kotak Uji Coba Cepat")
+            input_text = st.text_input("Ketik ulasan sembarang di bawah ini untuk melihat reaksi kilat AI:")
+            if input_text:
+                vec_input = vectorizer_base.transform([input_text])
+                pred = model_base.predict(vec_input)[0]
+                warna = "green" if pred == "Membeli" else "red"
+                st.markdown(f"### Hasil Analisis: :{warna}[{pred}]")
+                
         else:
-            st.error("File kosong atau tidak memiliki kolom teks yang bisa dibaca.")
+            st.error("File tidak memiliki kolom teks yang bisa dibaca.")
 else:
-    st.info("Silakan unggah file ulasan Anda di sidebar untuk memulai analisis otomatis.")
+    # Tampilan awal saat baru membuka web (Elegan & Bersih)
+    st.info("👋 Selamat Datang! Silakan unggah file Excel/CSV data toko Anda melalui menu sidebar di sebelah kiri untuk memulai analisis otomatis.")
